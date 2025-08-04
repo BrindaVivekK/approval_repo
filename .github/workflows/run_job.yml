@@ -1,0 +1,62 @@
+name: Run Databricks Job on Approval or Rejection
+
+on:
+  workflow_dispatch:
+    inputs:
+      decision:
+        description: "Approval decision"
+        required: true
+        type: choice
+        options:
+          - approve
+          - reject
+
+jobs:
+  handle-decision:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          pip install databricks-cli jq
+
+      - name: Set environment variables
+        run: |
+          echo "DATABRICKS_HOST=https://adb-2376768479807879.19.azuredatabricks.net" >> $GITHUB_ENV
+          echo "DATABRICKS_CLIENT_ID=8230cc9e-3334-415f-9a55-395e665cfa19" >> $GITHUB_ENV
+          echo "DATABRICKS_CLIENT_SECRET=dose866835cb24a4eb9ca3ad5f7782f25533" >> $GITHUB_ENV
+          echo "DATABRICKS_TENANT_ID=1c2be116-d207-42f3-952b-c66289745879" >> $GITHUB_ENV
+          echo "DATABRICKS_WORKSPACE_RESOURCE_ID=/subscriptions/5ce40752-421c-480b-87d4-5f09cdb38d1a/resourceGroups/rg-Databrick/providers/Microsoft.Databricks/workspaces/Ds-Databricks-dev" >> $GITHUB_ENV
+
+      - name: Configure Databricks CLI
+        run: |
+          mkdir -p ~/.databricks
+          echo "[DEFAULT]" > ~/.databricks/config
+          echo "host = $DATABRICKS_HOST" >> ~/.databricks/config
+          echo "token = $DATABRICKS_CLIENT_SECRET" >> ~/.databricks/config
+
+      - name: Read approval.json
+        run: |
+          echo " Fetching approval.json from DBFS..."
+          databricks fs cp dbfs:/Volumes/llmops/model_registry/approval/approval.json approval.json
+          cat approval.json
+
+      - name: Extract usecase
+        id: extract
+        run: |
+          USECASE=$(jq -r '.usecase' approval.json)
+          echo "usecase=$USECASE" >> $GITHUB_OUTPUT
+
+      - name: Handle Approval or Rejection
+        run: |
+          if [[ "${{ github.event.inputs.decision }}" == "approve" ]]; then
+            echo " Approved. Running Databricks job with usecase: ${{ steps.extract.outputs.usecase }}"
+            databricks jobs run-now --job-id 1234 \
+              --json-params "{\"usecase\": \"${{ steps.extract.outputs.usecase }}\"}"
+          else
+            echo " Rejected. Skipping job trigger. Logging event..."
+            echo "{\"status\": \"rejected\", \"usecase\": \"${{ steps.extract.outputs.usecase }}\", \"timestamp\": \"$(date)\"}" >> rejection_log.json
+          fi
