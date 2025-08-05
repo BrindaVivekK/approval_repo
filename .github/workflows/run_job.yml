@@ -19,12 +19,12 @@ jobs:
       - name: Set environment variables
         run: |
           echo "DATABRICKS_HOST=adb-2376768479807879.19.azuredatabricks.net" >> $GITHUB_ENV
-          echo "DATABRICKS_TOKEN=dose866835cb24a4eb9ca3ad5f7782f25533" >> $GITHUB_ENV
+
 
       - name: Trigger Databricks Job with Approval Status
         env:
           DATABRICKS_HOST: ${{ env.DATABRICKS_HOST }}
-          DATABRICKS_TOKEN: ${{ env.DATABRICKS_TOKEN }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
           curl -X POST "https://${DATABRICKS_HOST}/api/2.1/jobs/run-now" \
             -H "Authorization: Bearer ${DATABRICKS_TOKEN}" \
