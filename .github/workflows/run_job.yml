@@ -8,8 +8,8 @@ on:
         required: true
         type: choice
         options:
-          - approve
-          - reject
+          - approved
+          - rejected
 
 jobs:
   handle-decision:
@@ -20,18 +20,17 @@ jobs:
         run: |
           echo "DATABRICKS_HOST=adb-2376768479807879.19.azuredatabricks.net" >> $GITHUB_ENV
 
-
       - name: Trigger Databricks Job with Approval Status
         env:
           DATABRICKS_HOST: ${{ env.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
         run: |
+          echo "Triggering job with decision: ${{ github.event.inputs.decision }}"
+          
           curl -X POST "https://${DATABRICKS_HOST}/api/2.1/jobs/run-now" \
             -H "Authorization: Bearer ${DATABRICKS_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "job_id": 970491915739877,
-              "notebook_params": {
-                "status": "'"${{ github.event.inputs.decision }}"'"
-              }
-            }'
+            -d "{
+              \"job_id\": 970491915739877,
+              \"job_parameters\": [\"status\", \"${{ github.event.inputs.decision }}\"]
+            }"
