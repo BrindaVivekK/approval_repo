@@ -32,7 +32,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "job_id": "970491915739877",
-              "job_params": {
+              "job_parameters": {
                 "status": "${{ github.event.inputs.decision }}"
               }
             }'
