@@ -16,23 +16,57 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Set environment variables
         run: |
           echo "DATABRICKS_HOST=adb-2376768479807879.19.azuredatabricks.net" >> $GITHUB_ENV
 
-      - name: Trigger Databricks Job with Approval Status
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Databricks SDK
+        run: pip install databricks-sdk
+
+      - name: Run job using Databricks SDK
         env:
           DATABRICKS_HOST: ${{ env.DATABRICKS_HOST }}
           DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+          DECISION: ${{ github.event.inputs.decision }}
         run: |
-          echo "Triggering job with decision: ${{ github.event.inputs.decision }}"
+          python <<EOF
+          from databricks.sdk import WorkspaceClient
+          from databricks.sdk.errors import NotFound
 
-          curl -X POST "https://${DATABRICKS_HOST}/api/2.1/jobs/run-now" \
-            -H "Authorization: Bearer ${DATABRICKS_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "job_id": "970491915739877",
-              "job_parameters": {
-                "status": "${{ github.event.inputs.decision }}"
+          job_name = "update_endpoint"
+          decision = "${DECISION}"
+
+          # Create Databricks client
+          w = WorkspaceClient(
+              host="${DATABRICKS_HOST}",
+              token="${DATABRICKS_TOKEN}"
+          )
+
+          # Fetch all jobs and find the one with the matching name
+          job_id = None
+          for job in w.jobs.list():
+              if job.settings.name == job_name:
+                  job_id = job.job_id
+                  break
+
+          if not job_id:
+              raise ValueError(f"Job with name '{job_name}' not found.")
+
+          # Trigger the job run
+          run = w.jobs.run_now(
+              job_id=job_id,
+              notebook_params={
+                  "status": decision
               }
-            }'
+          )
+
+          print(f"Triggered job ID {job_id} with run ID {run.run_id} and status {decision}")
+          EOF
