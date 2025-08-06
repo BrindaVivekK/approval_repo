@@ -63,7 +63,7 @@ jobs:
           # Trigger the job run
           run = w.jobs.run_now(
               job_id=job_id,
-              notebook_params={
+              job_parameters={
                   "status": decision
               }
           )
